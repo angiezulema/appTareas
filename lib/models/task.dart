@@ -21,8 +21,9 @@ class Task {
     this.isCompleted = false,
     this.isFavorite = false,
     this.priority = TaskPriority.ninguna,
-  }) : id = id ?? Uuid().v4();
+  }) : id = id ?? const Uuid().v4();
 
+  // toMap y fromMap (si los usas para persistencia)
   Map<String, dynamic> toMap() {
     return {
       'id': id,

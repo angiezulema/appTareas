@@ -1,10 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart'; // Asegúrate de tener esta importación si usas DateFormat
 import '../models/task.dart';
 import '../utils/app_colors.dart';
 import '../widgets/task_item.dart';
 import '../widgets/favorite_card.dart';
 import '../widgets/add_task_dialog.dart';
-import 'calendar_view.dart'; // CAMBIO: Importar la vista de calendario
+import 'calendar_view.dart'; // Asumiendo que tienes esta vista
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -14,39 +15,41 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
-  // CAMBIO: Actualizar datos iniciales con dueDate y más variedad
+  // Lista de tareas de ejemplo, adaptada para parecerse a la imagen.
   final List<Task> _tasks = [
-    Task(title: "Revisar Wireframes App", time: "10:00", dueDate: DateTime.now(), isFavorite: true, priority: TaskPriority.alta, category: "Diseño"),
-    Task(title: "Llamada Cliente X", time: "15:30", dueDate: DateTime.now(), category: "Ventas"),
-    Task(title: "Planificar Sprint Semanal", time: "Mañana", dueDate: DateTime.now().add(Duration(days: 1)), isFavorite: true, priority: TaskPriority.media, category: "Trabajo"),
-    Task(title: "Comprar Regalo Cumpleaños", category: "Personal", time: "Tarde", dueDate: DateTime.now().add(Duration(days: 2))),
-    Task(title: "Actualizar Documentación API", category: "IT", time: "Todo el día", dueDate: DateTime.now().add(Duration(days: 3))),
-    Task(title: "Ir al Gimnasio", category: "Personal", time: "18:00", dueDate: DateTime.now().add(Duration(days: 1))),
+    Task(title: "Revisar Wireframes App", time: "", dueDate: DateTime.now().add(const Duration(days: 2)), isFavorite: true, priority: TaskPriority.alta, category: "App"),
+    Task(title: "Planificar Sprint Semanal", time: "", dueDate: DateTime.now().add(const Duration(days: 3)), isFavorite: true, priority: TaskPriority.media, category: "Semanal"),
+    Task(title: "almorzar con marco", category: "Personal", time: "Tarde", dueDate: DateTime(2023, 6, 3)),
+    Task(title: "Llamada Cliente X", category: "Ventas", time: "15:30", dueDate: DateTime(2023, 6, 3)),
+    Task(title: "Ir al Gimnasio", category: "Personal", time: "18:00", dueDate: DateTime.now()),
+    Task(title: "Comprar Regalo Cumpleaños", category: "Personal", time: "Tarde", dueDate: DateTime.now().add(const Duration(days: 1))),
+    Task(title: "Actualizar Documentación API", category: "Trabajo", time: "", dueDate: DateTime.now().add(const Duration(days: 1))),
   ];
 
   int _currentIndex = 0; // 0: Inicio, 1: Calendario, 2: Perfil
 
+  // Filtra la lista de tareas para obtener solo las favoritas.
   List<Task> get _favoriteTasks => _tasks.where((task) => task.isFavorite).toList();
 
-  // CAMBIO: Mejorar lógica de _regularTasks para ordenar por fecha y estado de completitud
+  // Filtra y ordena las tareas que no son favoritas y están pendientes o son para hoy/futuro.
   List<Task> get _regularTasks {
     final today = DateTime(DateTime.now().year, DateTime.now().month, DateTime.now().day);
     return _tasks.where((task) {
-      // Mostrar tareas no favoritas que están pendientes o son para hoy/futuro
-      bool isDueOrUpcoming = task.dueDate == null || task.dueDate!.isAfter(today.subtract(Duration(days:1))) || task.dueDate == today;
+      bool isDueOrUpcoming = task.dueDate == null || task.dueDate!.isAfter(today.subtract(const Duration(days:1))) || task.dueDate!.isAtSameMomentAs(today);
       return !task.isFavorite && (isDueOrUpcoming || !task.isCompleted);
     }).toList()
-    ..sort((a, b) { // Ordenar: no completadas primero, luego por fecha
-        if (a.isCompleted == b.isCompleted) { // Si ambas están completas o no completas
-          if (a.dueDate == null && b.dueDate == null) return 0; // Sin fecha, mantener orden
-          if (a.dueDate == null) return 1; // 'a' sin fecha va después
-          if (b.dueDate == null) return -1; // 'b' sin fecha va después (así 'a' con fecha va antes)
-          return a.dueDate!.compareTo(b.dueDate!); // Comparar por fecha
+    ..sort((a, b) { // Ordena: no completadas primero, luego por fecha.
+        if (a.isCompleted == b.isCompleted) {
+          if (a.dueDate == null && b.dueDate == null) return 0;
+          if (a.dueDate == null) return 1;
+          if (b.dueDate == null) return -1;
+          return a.dueDate!.compareTo(b.dueDate!);
         }
-        return a.isCompleted ? 1 : -1; // No completadas (false = 0) antes que completadas (true = 1)
+        return a.isCompleted ? 1 : -1;
     });
   }
 
+  // --- Métodos para manejar tareas ---
   void _addTask(Task task) {
     setState(() {
       _tasks.add(task);
@@ -74,17 +77,22 @@ class _HomeScreenState extends State<HomeScreen> {
     });
   }
 
+  // Cambia el estado de favorito de una tarea.
   void _toggleFavorite(Task task) {
     setState(() {
       task.isFavorite = !task.isFavorite;
-      if (!task.isFavorite) {
-        task.priority = TaskPriority.ninguna;
-      } else if (task.priority == TaskPriority.ninguna) {
+      // Opcional: Ajustar la prioridad cuando se (des)marca como favorito.
+      if (!task.isFavorite && task.priority != TaskPriority.ninguna) {
+        // Si se quita de favoritos y tenía una prioridad, podrías resetearla o mantenerla.
+        // task.priority = TaskPriority.ninguna; // Ejemplo de resetear.
+      } else if (task.isFavorite && task.priority == TaskPriority.ninguna) {
+        // Si se añade a favoritos y no tiene prioridad, asignarle una media por defecto.
         task.priority = TaskPriority.media;
       }
     });
   }
 
+  // Abre el diálogo para añadir o editar una tarea.
   void _openAddTaskDialog({Task? taskToEdit}) async {
     final result = await showAddTaskDialog(context, taskToEdit: taskToEdit);
     if (result != null) {
@@ -96,148 +104,180 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
-  // CAMBIO: Widget para construir el contenido de la pantalla de Inicio
+  // Construye el contenido de la pestaña "Inicio".
   Widget _buildHomeScreenContent() {
     return Container(
-      color: Color(0xFFF9FAFB), // Fondo gris claro para la pantalla de inicio
-      child: SingleChildScrollView(
-        padding: const EdgeInsets.all(0), // Padding manejado internamente
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Padding(
-              padding: const EdgeInsets.fromLTRB(20.0, 20.0, 20.0, 16.0),
-              child: TextField(
-                decoration: InputDecoration(
-                  hintText: 'Buscar tareas...',
-                  prefixIcon: Icon(Icons.search, color: AppColors.mediumGreyText),
-                  filled: true,
-                  fillColor: Colors.white,
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12.0),
-                    borderSide: BorderSide(color: Colors.grey.shade300, width: 0.8),
-                  ),
-                  enabledBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12.0),
-                    borderSide: BorderSide(color: Colors.grey.shade300, width: 0.8),
-                  ),
-                  focusedBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12.0),
-                    borderSide: BorderSide(color: AppColors.primaryBlue, width: 1.2),
-                  ),
-                  contentPadding: EdgeInsets.symmetric(vertical: 14, horizontal: 16),
+      color: Colors.white, // Fondo blanco general.
+      child: ListView( // ListView principal para permitir scroll de toda la pantalla.
+        padding: EdgeInsets.zero,
+        children: [
+          // --- Barra de Búsqueda ---
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16.0, 20.0, 16.0, 12.0),
+            child: TextField(
+              decoration: InputDecoration(
+                hintText: 'Buscar tareas...',
+                hintStyle: const TextStyle(color: AppColors.searchHintGrey, fontSize: 16),
+                prefixIcon: const Icon(Icons.search, color: AppColors.searchHintGrey, size: 24),
+                filled: true,
+                fillColor: AppColors.searchBackground,
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12.0),
+                  borderSide: BorderSide.none,
                 ),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12.0),
+                  borderSide: BorderSide.none,
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12.0),
+                  borderSide: const BorderSide(color: AppColors.headerBlue, width: 1.2),
+                ),
+                contentPadding: const EdgeInsets.symmetric(vertical: 14, horizontal: 10),
               ),
             ),
-            if (_favoriteTasks.isNotEmpty) ...[
-              Padding(
-                padding: const EdgeInsets.fromLTRB(20.0, 10.0, 20.0, 8.0),
-                child: Row(
-                  children: [
-                    Icon(Icons.star, color: AppColors.primaryBlue, size: 20),
-                    const SizedBox(width: 8),
-                    Text(
-                      'Favoritos',
-                      style: TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
-                          color: AppColors.darkGreyText),
+          ),
+
+          // --- Sección Favoritos ---
+          // Solo se muestra si hay tareas favoritas.
+          if (_favoriteTasks.isNotEmpty) ...[
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20.0, 16.0, 20.0, 8.0),
+              child: Row(
+                children: const [
+                  Icon(Icons.star, color: AppColors.favoriteStarBlue, size: 22),
+                  SizedBox(width: 8),
+                  Text(
+                    'Favoritos',
+                    style: TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.bold,
+                        color: AppColors.sectionTitleDark),
+                  ),
+                ],
+              ),
+            ),
+            Container(
+              height: 115, // Altura fija para la lista horizontal de favoritos.
+              padding: const EdgeInsets.only(left: 20.0, top: 4, bottom: 8, right: 8.0),
+              child: ListView.builder(
+                scrollDirection: Axis.horizontal,
+                itemCount: _favoriteTasks.length,
+                itemBuilder: (context, index) {
+                  final favoriteTask = _favoriteTasks[index];
+                  return Padding(
+                    padding: const EdgeInsets.only(right: 12.0), // Espacio entre tarjetas de favoritos.
+                    child: FavoriteCard(
+                      task: favoriteTask,
+                      // Se pasa la función _toggleFavorite para que se ejecute al tocar la tarjeta.
+                      onToggleFavorite: () => _toggleFavorite(favoriteTask),
                     ),
-                  ],
-                ),
-              ),
-              Container(
-                height: 110,
-                padding: const EdgeInsets.only(left: 20.0, top: 4, bottom: 8),
-                child: ListView.builder(
-                  scrollDirection: Axis.horizontal,
-                  itemCount: _favoriteTasks.length,
-                  itemBuilder: (context, index) {
-                    return FavoriteCard(task: _favoriteTasks[index]);
-                  },
-                ),
-              ),
-            ],
-            Padding(
-              padding: EdgeInsets.fromLTRB(20.0, _favoriteTasks.isNotEmpty ? 16.0 : 10.0 , 20.0, 8.0),
-              child: Text(
-                'Mis Tareas',
-                style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                    color: AppColors.darkGreyText),
+                  );
+                },
               ),
             ),
-            _regularTasks.isEmpty
-                ? Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 40.0, horizontal: 20.0),
-                    child: Center(child: Text("¡Todo listo por hoy! No hay tareas pendientes.", style: TextStyle(color: AppColors.mediumGreyText, fontSize: 15))),
-                  )
-                : ListView.builder(
-                    shrinkWrap: true,
-                    physics: NeverScrollableScrollPhysics(),
-                    padding: EdgeInsets.fromLTRB(20.0, 0, 20.0, 80.0), // Espacio para FAB
-                    itemCount: _regularTasks.length,
-                    itemBuilder: (context, index) {
-                      final task = _regularTasks[index];
-                      return TaskItem(
-                        task: task,
-                        onToggleComplete: () => _toggleComplete(task),
-                        onEdit: () => _openAddTaskDialog(taskToEdit: task),
-                        onDelete: () => _deleteTask(task),
-                        onToggleFavorite: () => _toggleFavorite(task),
-                      );
-                    },
-                  ),
           ],
-        ),
+
+          // --- Sección Mis Tareas ---
+          Padding(
+            padding: EdgeInsets.fromLTRB(20.0, _favoriteTasks.isNotEmpty ? 20.0 : 16.0 , 20.0, 12.0),
+            child: const Text(
+              'Mis Tareas',
+              style: TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.bold,
+                  color: AppColors.sectionTitleDark),
+            ),
+          ),
+          // Muestra un mensaje si no hay tareas regulares, o la lista de tareas.
+          _regularTasks.isEmpty
+              ? const Padding(
+                  padding: EdgeInsets.symmetric(vertical: 40.0, horizontal: 20.0),
+                  child: Center(child: Text("¡Todo listo por hoy! No hay tareas pendientes.", style: TextStyle(color: AppColors.mediumGreyText, fontSize: 15))),
+                )
+              : Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                  child: ListView.builder(
+                      shrinkWrap: true, // Necesario cuando un ListView está dentro de otro scrollable.
+                      physics: const NeverScrollableScrollPhysics(), // Deshabilita el scroll propio del ListView interno.
+                      itemCount: _regularTasks.length,
+                      itemBuilder: (context, index) {
+                        final task = _regularTasks[index];
+                        return Padding(
+                          padding: const EdgeInsets.only(bottom: 10.0), // Espacio vertical entre TaskItems.
+                          child: TaskItem(
+                            task: task,
+                            onToggleComplete: () => _toggleComplete(task),
+                            onEdit: () => _openAddTaskDialog(taskToEdit: task),
+                            onDelete: () => _deleteTask(task),
+                            onToggleFavorite: () => _toggleFavorite(task),
+                          ),
+                        );
+                      },
+                    ),
+                ),
+          // Espacio al final para que el FloatingActionButton no tape la última tarea.
+          const SizedBox(height: 80),
+        ],
       ),
     );
   }
 
-  // CAMBIO: Método para construir el AppBar condicionalmente
+  // Construye el AppBar de forma condicional según la pestaña actual.
   PreferredSizeWidget _buildAppBar() {
-    if (_currentIndex == 1) { // Si es la pestaña de Calendario
-      return AppBar(
-        backgroundColor: Colors.white,
-        elevation: 0.8,
-        centerTitle: false,
-        titleSpacing: 20.0,
-        title: Text(
-          'Calendario',
-          style: TextStyle(
-            color: AppColors.darkGreyText,
-            fontSize: 26,
-            fontWeight: FontWeight.bold,
+    if (_currentIndex == 0) { // AppBar para la pestaña de Inicio.
+      return PreferredSize(
+        preferredSize: const Size.fromHeight(100.0),
+        child: AppBar(
+          backgroundColor: AppColors.headerBlue,
+          elevation: 0,
+          automaticallyImplyLeading: false,
+          flexibleSpace: SafeArea(
+            child: Padding(
+              padding: const EdgeInsets.only(left: 20.0, right: 20.0, top: 15.0, bottom:10.0),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  const Text(
+                    'Mis Tareas',
+                    style: TextStyle(
+                        color: AppColors.textWhite,
+                        fontSize: 28,
+                        fontWeight: FontWeight.bold),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    'Organiza tu día',
+                    style: TextStyle(color: AppColors.textWhite.withOpacity(0.85), fontSize: 16),
+                  ),
+                ],
+              ),
+            ),
           ),
         ),
+      );
+    } else if (_currentIndex == 1) { // AppBar para la pestaña de Calendario.
+      return AppBar(
+        backgroundColor: Colors.white, elevation: 0.8, centerTitle: false, titleSpacing: 20.0,
+        title: const Text('Calendario', style: TextStyle(color: AppColors.darkGreyText, fontSize: 26, fontWeight: FontWeight.bold)),
         automaticallyImplyLeading: false,
       );
-    } else { // AppBar para la pestaña de Inicio y Perfil
+    } else { // AppBar para la pestaña de Perfil.
       return PreferredSize(
-        preferredSize: Size.fromHeight(100.0),
+        preferredSize: const Size.fromHeight(100.0),
         child: AppBar(
-          backgroundColor: AppColors.primaryBlue,
+          backgroundColor: AppColors.primaryBlue, // Podrías usar AppColors.headerBlue también para consistencia.
           elevation: 0,
           automaticallyImplyLeading: false,
           flexibleSpace: Padding(
             padding: const EdgeInsets.only(left: 20.0, top: 45.0, right: 20.0, bottom: 10.0),
             child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisAlignment: MainAxisAlignment.end,
+              crossAxisAlignment: CrossAxisAlignment.start, mainAxisAlignment: MainAxisAlignment.end,
               children: [
-                Text(
-                  _currentIndex == 2 ? 'Mi Perfil' : 'Mis Tareas', // Título dinámico para Perfil
-                  style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 28,
-                      fontWeight: FontWeight.bold),
-                ),
-                SizedBox(height: 4),
-                Text(
-                  _currentIndex == 2 ? 'Tu información y configuración' : 'Organiza tu día', // Subtítulo dinámico
-                  style: TextStyle(color: Colors.white.withOpacity(0.85), fontSize: 16),
-                ),
+                const Text('Mi Perfil', style: TextStyle(color: Colors.white, fontSize: 28, fontWeight: FontWeight.bold)),
+                const SizedBox(height: 4),
+                Text('Tu información y configuración', style: TextStyle(color: Colors.white.withOpacity(0.85), fontSize: 16)),
               ],
             ),
           ),
@@ -246,42 +286,44 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
+  // Método principal de construcción del widget.
   @override
   Widget build(BuildContext context) {
-    // CAMBIO: Determinar la vista actual (currentView) basada en _currentIndex
     Widget currentView;
+    // Determina qué vista mostrar basado en el índice de la pestaña actual.
     switch (_currentIndex) {
-      case 0: // Inicio
+      case 0:
         currentView = _buildHomeScreenContent();
         break;
-      case 1: // Calendario
-        currentView = CalendarView(
-          tasks: _tasks, // Pasar la lista de tareas al calendario
+      case 1:
+        currentView = CalendarView( // Asume que CalendarView está implementado.
+          tasks: _tasks,
           onToggleComplete: _toggleComplete,
           onEditTask: _editTask,
           onDeleteTask: _deleteTask,
           onToggleFavorite: _toggleFavorite,
         );
         break;
-      case 2: // Perfil
-        currentView = Center(child: Text("Pantalla de Perfil (Aún no implementada)", style: TextStyle(fontSize: 16, color: AppColors.mediumGreyText)));
+      case 2:
+        currentView = const Center(child: Text("Pantalla de Perfil (Aún no implementada)", style: TextStyle(fontSize: 16, color: AppColors.mediumGreyText)));
         break;
       default:
-        currentView = _buildHomeScreenContent(); // Por defecto, mostrar contenido de inicio
+        currentView = _buildHomeScreenContent();
     }
 
     return Scaffold(
-      appBar: _buildAppBar(), // Usar el AppBar condicional
-      body: currentView, // Mostrar la vista actual
-      // CAMBIO: FloatingActionButton solo para la vista de Inicio (_currentIndex == 0)
+      appBar: _buildAppBar(),
+      body: currentView,
+      // FloatingActionButton solo se muestra en la pestaña de Inicio.
       floatingActionButton: _currentIndex == 0 ? FloatingActionButton(
         onPressed: () => _openAddTaskDialog(),
-        backgroundColor: AppColors.primaryBlue,
-        child: Icon(Icons.add, color: Colors.white),
+        backgroundColor: AppColors.fabBlue,
         tooltip: 'Nueva Tarea',
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)), // Forma cuadrada redondeada.
+        child: const Icon(Icons.add, color: Colors.white, size: 28),
       ) : null,
       floatingActionButtonLocation: FloatingActionButtonLocation.endFloat,
-      // CAMBIO: Actualizar BottomNavigationBar para quitar "Listas"
+      // Barra de navegación inferior.
       bottomNavigationBar: BottomNavigationBar(
         currentIndex: _currentIndex,
         onTap: (index) {
@@ -289,29 +331,17 @@ class _HomeScreenState extends State<HomeScreen> {
             _currentIndex = index;
           });
         },
-        type: BottomNavigationBarType.fixed,
-        selectedItemColor: AppColors.primaryBlue,
-        unselectedItemColor: AppColors.mediumGreyText,
-        selectedLabelStyle: TextStyle(fontWeight: FontWeight.w600, fontSize: 11),
-        unselectedLabelStyle: TextStyle(fontSize: 11),
+        type: BottomNavigationBarType.fixed, // Para que todos los labels sean visibles.
+        selectedItemColor: AppColors.headerBlue, // Color del ítem seleccionado.
+        unselectedItemColor: AppColors.mediumGreyText, // Color de ítems no seleccionados.
+        selectedLabelStyle: const TextStyle(fontWeight: FontWeight.w600, fontSize: 11),
+        unselectedLabelStyle: const TextStyle(fontSize: 11),
         backgroundColor: Colors.white,
-        elevation: 8.0,
+        elevation: 8.0, // Sombra de la barra.
         items: const [
-          BottomNavigationBarItem(
-            icon: Icon(Icons.home_outlined),
-            activeIcon: Icon(Icons.home), // Icono para estado activo
-            label: 'Inicio',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.calendar_today_outlined),
-            activeIcon: Icon(Icons.calendar_today),
-            label: 'Calendario',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.person_outline),
-            activeIcon: Icon(Icons.person),
-            label: 'Perfil',
-          ),
+          BottomNavigationBarItem(icon: Icon(Icons.home_outlined), activeIcon: Icon(Icons.home), label: 'Inicio'),
+          BottomNavigationBarItem(icon: Icon(Icons.calendar_today_outlined), activeIcon: Icon(Icons.calendar_today), label: 'Calendario'),
+          BottomNavigationBarItem(icon: Icon(Icons.person_outline), activeIcon: Icon(Icons.person), label: 'Perfil'),
         ],
       ),
     );
